@@ -31,67 +31,73 @@ class ListenThread extends Thread {
                 this.files = new HashMap<String, Integer>();
 
             InputStream is = this.s.getInputStream();
+            OutputStream os = this.s.getOutputStream();
             byte[] msg = new byte[BYTE_LENGTH];
             String line = "";
 
             do {
                 is.read(msg);
                 line = new String(msg);
-                System.out.println(line);
+                System.out.print(line);
                 String[] parts = line.split(Pattern.quote("|"));
+                System.out.println(parts.length);
 
-                
                 if (isInitial == false) {
-                    if (parts[1] == "subfolder") {
-                        /* FOLDER PROCESS */
+                    for (int i = 0; i < parts.length - 1; i++)
+                        if (i % 2 == 0 && parts[i + 1].equals("subfolder")) {
+                            /* FOLDER PROCESS */
 
-                        if (this.folders.get(parts[0]) == null) {
-                            System.out.println("a subfolder created");
-                            this.folders.put(parts[0], 2);
-                        }
-
-                        this.folders.remove(parts[0]);
-                        this.folders.put(parts[0], 1);
-
-                    }
-
-                    else if (parts[1] != null) {
-                        /* FILE PROCESS */
-                        int sizeOfFile = Integer.parseInt(parts[1]);
-                        if (this.files.get(parts[0]) == null) {
-                            System.out.println("a file created");
-                            this.files.put(parts[0], sizeOfFile);
-                        }
-
-                        if (this.files.get(parts[0]) != sizeOfFile) {
-                            System.out.println("a file modified");
-                            this.files.remove(parts[0]);
-                            this.files.put(parts[0], sizeOfFile);
-                        }
-                    }
-
-                    if (line == "Done") {
-
-                        for (String folder : this.folders.keySet())
-                            if (this.folders.get(folder) == 0) {
-                                System.out.println("A folder deleted");
-                                this.folders.remove(folder);
+                            if (this.folders.get(parts[i]) == null) {
+                                System.out.println("a subfolder created");
+                                this.folders.put(parts[i], 2);
                             }
-                    }
+
+                            this.folders.remove(parts[i]);
+                            this.folders.put(parts[i], 1);
+
+                        }
+
+                        else if (i % 2 == 0 && !parts[i + 1].equals("Done") && !parts[i + 1].equals("subfolder")) {
+                            /* FILE PROCESS */
+                            int sizeOfFile = Integer.parseInt(parts[i + 1]);
+                            if (this.files.get(parts[i]) == null) {
+                                System.out.println("a file created");
+                                this.files.put(parts[i], sizeOfFile);
+                            }
+
+                            if (this.files.get(parts[i]) != sizeOfFile) {
+                                System.out.println("a file modified");
+                                this.files.remove(parts[i]);
+                                this.files.put(parts[i], sizeOfFile);
+                            }
+                        }
+
+                        else if (parts[i].equals("Done")) {
+
+                            for (String folder : this.folders.keySet())
+                                if (this.folders.get(folder) == 0) {
+                                    System.out.println("A folder deleted");
+                                    this.folders.remove(folder);
+                                }
+                            
+                        }
                 }
 
                 else {
                     /* FIRST LET SERVER KNOW WHAT FOLDER STRUCTURE IS LIKE IN CLIENT */
-                    if (parts[1] == "subfolder") {
-                        this.folders.put(parts[0], 1);
-                    } else if (parts[1] != null) {
-                        int size = Integer.parseInt(parts[1]);
-                        this.files.put(parts[0], size);
-                    }
+                    for (int i = 0; i < parts.length - 1; i++)
+                        if (i % 2 == 0 && parts[i + 1].equals("subfolder")) {
+                            System.out.println(parts[i]);
+                            this.folders.put(parts[i], 1);
+                        } else if (i % 2 == 0 && !parts[i + 1].equals("Done") && parts[i + 1].equals("subfolder")) {
+                            System.out.println(parts[i]);
+                            int size = Integer.parseInt(parts[i + 1]);
+                            this.files.put(parts[i], size);
+                        }
 
-                    if (line == "Done") {
-                        isInitial = false;
-                    }
+                        else if (parts[i].equals("Done")) {
+                            isInitial = false;
+                        }
                 }
             } while (true);
         } catch (IOException e) {
