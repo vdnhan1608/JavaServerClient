@@ -22,10 +22,6 @@ public class Client {
         String path = br.readLine();
 
         File file = new File(path);
-        // if (file.isDirectory())
-        //     System.out.println("Directory");
-        // else
-        //     System.out.println("File");
 
         OutputStream os = s.getOutputStream();
         byte[] buf = new byte[BYTE_LENGTH];
@@ -37,40 +33,41 @@ public class Client {
 
             /* SEND SUBFOLDER NAME TO SERVER */
             for (int i = 0; i < directories.length; i++) {
+                System.out.print(directories[i] + " ");
                 String pathName = path + "\\" + directories[i];
-                if (new File(pathName).isDirectory()) // Check if 1 path name is directory or file
-                  //  os.write((directories[i] + "|subfolder|").getBytes()); // Send name|subfolder
+                File newFile = new File(pathName);
+                if (newFile.isDirectory() && newFile.exists()) // Check if 1 path name is directory or file
+                {
                     msg += directories[i] + "|subfolder|";
-                else {
+                    // os.write(msg.getBytes(), 0,msg.length());
+                    // os.flush();
+                }
+
+                else 
+                if (newFile.isFile() && newFile.exists()) {
                     int sizeOfFile = 0;
-                    // os.write((directories[i] + "|file").getBytes());
+
                     /*READ THE SIZE OF THE FILE */
                     /* IF SIZE CHANGE THEN FILE IS MODIFIED */
                     FileInputStream fis = new FileInputStream(pathName);
                     int length = fis.read(buf);
-                    // sizeOfFile += length;
-                    // if (length < BYTE_LENGTH)
-                    //     os.write((directories[i] + Integer.toString(sizeOfFile)).getBytes());
-                    // else
-                    //     while (length >= BYTE_LENGTH) {
-                    //         sizeOfFile += length;
-                    //         length = fis.read(msg);
-                    //     }
-                    //     sizeOfFile += length;
-                    // os.write((directories[i] + "|" + Integer.toString(sizeOfFile)).getBytes());
+
                     while (length != -1){
                         sizeOfFile += length;
                         length = fis.read(buf);
                     }
-                   // os.write((directories[i] + "|" + Integer.toString(sizeOfFile) + "|").getBytes());
+
                    msg += directories[i] + "|" + Integer.toString(sizeOfFile) + "|";
                     fis.close();
                 }
             }
-            msg += "Done";
-            os.write(msg.getBytes());
+            System.out.println();
+            msg += "Done\n";
+            os.write(msg.getBytes(), 0,msg.length());
             os.flush();
 
+            is.read(buf);
+            System.out.println(buf);
 
         } while (true);
 

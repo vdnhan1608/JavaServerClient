@@ -34,30 +34,38 @@ class ListenThread extends Thread {
             OutputStream os = this.s.getOutputStream();
             byte[] msg = new byte[BYTE_LENGTH];
             String line = "";
-
+            String regex = "\\d+";
             do {
-                is.read(msg);
-                line = new String(msg);
-                System.out.print(line);
-                String[] parts = line.split(Pattern.quote("|"));
-                System.out.println(parts.length);
+                line = "";
+                while (line.contains("Done") == false)
+                {
+                    is.read(msg,0, BYTE_LENGTH );
+                    line += new String(msg);
+                    String [] parts = line.split("\n");
+                    line = parts[0];
+                }
+                // System.out.println(line);
 
+                String[] parts = line.split(Pattern.quote("|"));
                 if (isInitial == false) {
-                    for (int i = 0; i < parts.length - 1; i++)
-                        if (i % 2 == 0 && parts[i + 1].equals("subfolder")) {
+                    for (int i = 0; i < parts.length; i++)
+                    {
+                        if (i % 2 == 0 && i + 1 < parts.length && parts[i + 1].equals("subfolder")) {
                             /* FOLDER PROCESS */
 
                             if (this.folders.get(parts[i]) == null) {
                                 System.out.println("a subfolder created");
                                 this.folders.put(parts[i], 2);
                             }
+                            else {
+                                this.folders.remove(parts[i]);
+                                this.folders.put(parts[i], 1);
+                            }
 
-                            this.folders.remove(parts[i]);
-                            this.folders.put(parts[i], 1);
 
                         }
 
-                        else if (i % 2 == 0 && !parts[i + 1].equals("Done") && !parts[i + 1].equals("subfolder")) {
+                        else if (i % 2 == 0 && i + 1 < parts.length && parts[i + 1].matches(regex)) {
                             /* FILE PROCESS */
                             int sizeOfFile = Integer.parseInt(parts[i + 1]);
                             if (this.files.get(parts[i]) == null) {
@@ -72,33 +80,43 @@ class ListenThread extends Thread {
                             }
                         }
 
-                        else if (parts[i].equals("Done")) {
+                        else if (i == parts.length - 1) {
 
                             for (String folder : this.folders.keySet())
                                 if (this.folders.get(folder) == 0) {
                                     System.out.println("A folder deleted");
                                     this.folders.remove(folder);
                                 }
-                            
+
                         }
+                    }
+
                 }
 
                 else {
                     /* FIRST LET SERVER KNOW WHAT FOLDER STRUCTURE IS LIKE IN CLIENT */
-                    for (int i = 0; i < parts.length - 1; i++)
-                        if (i % 2 == 0 && parts[i + 1].equals("subfolder")) {
-                            System.out.println(parts[i]);
+                    for (int i = 0; i < parts.length; i++) {
+                        if (i % 2 == 0 && i + 1 < parts.length && parts[i + 1].equals("subfolder")) {
                             this.folders.put(parts[i], 1);
-                        } else if (i % 2 == 0 && !parts[i + 1].equals("Done") && parts[i + 1].equals("subfolder")) {
-                            System.out.println(parts[i]);
+                        } else if (i % 2 == 0 && i + 1 < parts.length && parts[i + 1].matches(regex)) {
                             int size = Integer.parseInt(parts[i + 1]);
                             this.files.put(parts[i], size);
                         }
 
-                        else if (parts[i].equals("Done")) {
+                        else if (i == parts.length - 1) {
+                            // System.out.println(parts[i]);
                             isInitial = false;
                         }
+                    }
+
+                    for (String folder: this.folders.keySet())
+                    System.out.print(folder + " ");
+                    for (String file: this.files.keySet())
+                    System.out.print(file + " ");
                 }
+
+                os.write("OK\n".getBytes());
+                os.flush();
             } while (true);
         } catch (IOException e) {
             // TODO Auto-generated catch block
