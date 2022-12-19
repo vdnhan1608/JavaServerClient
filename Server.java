@@ -5,6 +5,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Scanner;
 import java.util.regex.Pattern;
@@ -16,7 +17,8 @@ class ListenThread extends Thread {
     Socket s;
     HashMap<String, Integer> folders; // int is used to check if the folder checked or not: 0: Not checked, 1:
                                       // Checked, 2: Created
-    HashMap<String, Integer> files = null;
+    HashMap<String, HashMap<Integer, Integer>> files = null; // 1st Integer is the size of file
+                                                             // 2nd Integer is (0: Not checked, 1: Checked, 2: Created)
 
     ListenThread(Socket s) {
         super();
@@ -28,7 +30,7 @@ class ListenThread extends Thread {
             if (this.folders == null)
                 this.folders = new HashMap<String, Integer>();
             if (this.files == null)
-                this.files = new HashMap<String, Integer>();
+                this.files = new HashMap<String, HashMap<Integer, Integer>>();
 
             InputStream is = this.s.getInputStream();
             OutputStream os = this.s.getOutputStream();
@@ -37,31 +39,27 @@ class ListenThread extends Thread {
             String regex = "\\d+";
             do {
                 line = "";
-                while (line.contains("Done") == false)
-                {
-                    is.read(msg,0, BYTE_LENGTH );
+                while (line.contains("Done") == false) {
+                    is.read(msg, 0, BYTE_LENGTH);
                     line += new String(msg);
-                    String [] parts = line.split("\n");
+                    String[] parts = line.split("\n");
                     line = parts[0];
                 }
                 // System.out.println(line);
 
                 String[] parts = line.split(Pattern.quote("|"));
                 if (isInitial == false) {
-                    for (int i = 0; i < parts.length; i++)
-                    {
+                    for (int i = 0; i < parts.length; i++) {
                         if (i % 2 == 0 && i + 1 < parts.length && parts[i + 1].equals("subfolder")) {
                             /* FOLDER PROCESS */
 
                             if (this.folders.get(parts[i]) == null) {
                                 System.out.println("a subfolder created");
                                 this.folders.put(parts[i], 2);
-                            }
-                            else {
+                            } else {
                                 this.folders.remove(parts[i]);
                                 this.folders.put(parts[i], 1);
                             }
-
 
                         }
 
@@ -70,23 +68,85 @@ class ListenThread extends Thread {
                             int sizeOfFile = Integer.parseInt(parts[i + 1]);
                             if (this.files.get(parts[i]) == null) {
                                 System.out.println("a file created");
-                                this.files.put(parts[i], sizeOfFile);
+                                HashMap<Integer, Integer> fileInfo = new HashMap<Integer, Integer>();
+                                fileInfo.put(sizeOfFile, 2);
+                                this.files.put(parts[i], fileInfo);
                             }
 
-                            if (this.files.get(parts[i]) != sizeOfFile) {
-                                System.out.println("a file modified");
-                                this.files.remove(parts[i]);
-                                this.files.put(parts[i], sizeOfFile);
+                            else {
+                                int oldSize = Integer
+                                        .parseInt(this.files.get(parts[i]).keySet().toArray()[0].toString());
+                                HashMap<Integer, Integer> oldInfo = this.files.get(parts[i]);
+                                if (oldSize != sizeOfFile) {
+                                    System.out.println("a file modified");
+                                    // HashMap<Integer, Integer> fileInfo = new HashMap<Integer, Integer>();
+                                    // fileInfo.put(sizeOfFile, 1);
+                                    // this.files.replace(parts[i], oldInfo, fileInfo);
+                                }
+
+                                HashMap<Integer, Integer> fileInfo = new HashMap<Integer, Integer>();
+                                fileInfo.put(sizeOfFile, 1);
+                                this.files.replace(parts[i], oldInfo, fileInfo);
+
                             }
+
                         }
 
                         else if (i == parts.length - 1) {
-
-                            for (String folder : this.folders.keySet())
+                            /* Check folder deleted */
+                            ArrayList<String> deletedFolders = new ArrayList<String>();
+                            for (String folder : this.folders.keySet()) {
                                 if (this.folders.get(folder) == 0) {
-                                    System.out.println("A folder deleted");
-                                    this.folders.remove(folder);
+                                    System.out.println("A subfolder deleted");
+                                    deletedFolders.add(folder);
+                                } else if (this.folders.get(folder) == 1)
+                                    this.folders.replace(folder, 1, 0);
+                                else if (this.folders.get(folder) == 2)
+                                    this.folders.replace(folder, 2, 0);
+                            }
+
+                            while (deletedFolders.size() > 0) {
+                                String folder = deletedFolders.get(deletedFolders.size() - 1);
+                                this.folders.remove(folder);
+                                deletedFolders.remove(deletedFolders.size() - 1);
+                            }
+
+                            // /* Set all folder to not checked */
+                            // for (String folder : this.folders.keySet())
+                            // {
+                            // if (this.folders.get(folder) == 1) this.folders.replace(folder, 1, 0);
+                            // else
+                            // if (this.folders.get(folder)== 2) this.folders.replace(folder, 2, 0);
+                            // }
+
+                            ArrayList<String> deletedFiles = new ArrayList<String>();
+                            /* Check file deleted && set to not checked */
+                            for (String file : this.files.keySet()) {
+                                HashMap<Integer, Integer> fileInfo = this.files.get(file);
+
+                                if (fileInfo.keySet().size() == 0)
+                                    System.out.println(fileInfo);
+                                int sizeOfFile = Integer.parseInt(fileInfo.keySet().toArray()[0].toString());
+
+                                if (fileInfo.get(sizeOfFile) == 0) {
+                                    System.out.println("A file deleted");
+                                    deletedFiles.add(file);
+                                } else if (fileInfo.get(sizeOfFile) == 1 || fileInfo.get(sizeOfFile) == 2) {
+
+                                    HashMap<Integer, Integer> newFileInfo = new HashMap<Integer, Integer>();
+                                    newFileInfo.put(sizeOfFile, 0);
+                                    this.files.replace(file, fileInfo, newFileInfo);
                                 }
+
+                            }
+
+                            while (deletedFiles.size() > 0) {
+                                String file = deletedFiles.get(deletedFiles.size() - 1);
+                                this.files.remove(file);
+                                deletedFiles.remove(deletedFiles.size() - 1);
+                            }
+
+                            /* Set all file to not checked */
 
                         }
                     }
@@ -100,7 +160,9 @@ class ListenThread extends Thread {
                             this.folders.put(parts[i], 1);
                         } else if (i % 2 == 0 && i + 1 < parts.length && parts[i + 1].matches(regex)) {
                             int size = Integer.parseInt(parts[i + 1]);
-                            this.files.put(parts[i], size);
+                            HashMap<Integer, Integer> fileInfo = new HashMap<Integer, Integer>();
+                            fileInfo.put(size, 1);
+                            this.files.put(parts[i], fileInfo);
                         }
 
                         else if (i == parts.length - 1) {
@@ -109,10 +171,10 @@ class ListenThread extends Thread {
                         }
                     }
 
-                    for (String folder: this.folders.keySet())
-                    System.out.print(folder + " ");
-                    for (String file: this.files.keySet())
-                    System.out.print(file + " ");
+                    for (String folder : this.folders.keySet())
+                        System.out.print(folder + " ");
+                    for (String file : this.files.keySet())
+                        System.out.print(file + " ");
                 }
 
                 os.write("OK\n".getBytes());
